@@ -1,143 +1,105 @@
-# 📱 Scroll or Study
+# 📱 ScrollOrStudy
 
-A smart Android productivity app that helps students track their study time vs screen scrolling habits and build better focus.
-
----
-
-## 🚀 Features Implemented
-
-### 🧠 1. Real-Time App Detection
-
-* Detects which app the user is currently using
-* Uses Accessibility Service for continuous monitoring
+**ScrollOrStudy** is a smart Android productivity app designed to help students track their study time versus scrolling habits, stay focused, and build consistent learning routines.  
 
 ---
 
-### ⏱️ 2. Time Tracking System
+## 🚀 Features Implemented (Completed)
 
-* Tracks **Scroll Time** (social media usage)
-* Tracks **Study Time** (educational apps + manual study)
-* Updates time in real-time
+### 🧠 Real-Time App Detection
+* Detects which app the user is actively using  
+* Uses Accessibility Service for continuous background monitoring  
 
----
+### ⏱️ Time Tracking System
+* Tracks **Scroll Time** (social media apps like Instagram)  
+* Tracks **Study Time** (educational apps like Google Classroom, GitHub, or manual study)  
+* Timer counts accurately even if the user switches apps  
+* Verified live via Logcat and in-app UI  
 
-### 📱 3. App Categorization System
+### 📱 App Categorization System
+* Apps classified into three categories:  
+  * **Distracting Apps:** counted as *Scroll Time*  
+  * **Study Apps:** counted as *Study Time*  
+  * **Neutral Apps:** ignored in tracking  
 
-Apps are categorized into:
+### 🚨 Smart Alert System
+* Shows a notification popup after 15 seconds of continuous scrolling  
+* Encourages users to return to study mode  
+* Works in real-time without crashing  
 
-* **Distracting Apps**
+### 📊 Daily Tracking Dashboard
+* Clean UI showing today’s stats:
+  * 📚 Study Time  
+  * 📱 Scroll Time  
+* Counts match logcat times  
+* UI includes “Welcome”, “Stay Focused”, live date, and **Start Study** button  
 
-  * Instagram, YouTube, Facebook, etc.
-  * Counted as *Scroll Time*
+### 🔥 Streak System
+* Tracks daily study consistency  
+* Displays streak count in the UI  
 
-* **Study Apps**
-
-  * Google Classroom, GitHub, learning platforms
-  * Counted as *Study Time*
-
-* **Neutral Apps**
-
-  * Settings, system apps
-  * Ignored (no tracking)
-
----
-
-### 🚨 4. Smart Alert System
-
-* Detects continuous scrolling
-* Triggers alert after 15 seconds
-* Encourages user to return to studying
-
----
-
-### 📊 5. Daily Tracking Dashboard
-
-* Displays:
-
-  * 📚 Study Time
-  * 📱 Scroll Time
-* Clean and simple UI for user awareness
+### ☁️ Firebase Integration (Basic)
+* Firebase Realtime Database connected  
+* Daily Study and Scroll data synced to the cloud  
+* Data stored under `user_data/<date>` structure  
+* Live sync works every 10 seconds  
+* Day-end sync implemented for previous day  
+* Database rules currently in **test mode**  
 
 ---
 
-### 🎯 6. Study Mode Support
-
-* Manual "Start Study" option
-* Allows tracking even when not using study apps
-
----
-
-### 🔥 7. Streak System (In Progress / Implemented)
-
-* Tracks daily consistency
-* Increases streak when:
-
-  * Study Time > Scroll Time
-* Resets streak when:
-
-  * Scroll Time exceeds study time
-
----
-
-## 🧩 How It Works
-
-1. App continuously monitors foreground app
-2. Matches app with category:
-
-   * Distracting → Scroll Time
-   * Study → Study Time
-   * Neutral → Ignore
-3. Timer updates every second
-4. Data is stored locally
-5. UI displays real-time stats
-6. Alerts trigger when excessive scrolling is detected
+## 🧩 How It Works (Current Implementation)
+1. App continuously monitors foreground app using Accessibility Service  
+2. Matches the app against defined categories:  
+   * Distracting → increments Scroll Time  
+   * Study → increments Study Time  
+   * Neutral → ignored  
+3. Timer updates every second  
+4. Alerts trigger when distraction exceeds 15 seconds  
+5. Data is stored locally and synced to Firebase in real-time  
+6. UI displays live stats and streak  
 
 ---
 
 ## 🛠️ Tech Stack
-
-* **Language:** Kotlin
-* **Platform:** Android (Android Studio)
-* **Core APIs:** Accessibility Service, Handler
-* **Storage:** SharedPreferences
+* **Language:** Kotlin  
+* **Platform:** Android (Android Studio)  
+* **Core APIs:** Accessibility Service, Foreground Service, Handlers  
+* **Storage:** SharedPreferences (local), Firebase Realtime Database (cloud)  
 
 ---
 
 ## 📌 Current Status
-
-✅ Core tracking system completed
-✅ UI Dashboard implemented
-✅ Alerts working
-🔄 Streak system in progress
+✅ Core app tracking system completed  
+✅ Real-time app detection implemented  
+✅ Study and scroll timers working perfectly  
+✅ Alerts functioning after 15 seconds of scrolling  
+✅ UI dashboard implemented (Welcome, Stats, Streak, Start Study button)  
+✅ Firebase Realtime Database connected and syncing data  
+🔄 Streak system partially implemented (UI shows streak, logic partially done)  
 
 ---
 
 ## 🚀 Upcoming Features
-
-* 🎯 Motivation Engine (quotes, funny alerts)
-* 🔥 Advanced Streak System (daily reset automation)
-* ☁️ Firebase Integration (cloud sync)
-* 👨‍👩‍👧 Parent Dashboard
-* 🤖 AI-based insights using Google Colab
-* 📊 Weekly & Monthly Reports
+* 🎯 Motivation Engine – daily quotes, fun reminders, encouragement messages  
+* 🔥 Advanced Streak System – automated daily reset, long-term tracking  
+* 👨‍👩‍👧 Parent Dashboard – monitor student study habits  
+* 🤖 AI-based insights using Google Colab  
+* 📊 Weekly & Monthly Reports – visualize study vs scrolling patterns  
 
 ---
 
 ## 🎯 Project Goal
-
-To help students:
-
-* Reduce unnecessary scrolling
-* Increase study focus
-* Build consistent learning habits
+* Reduce unnecessary scrolling  
+* Increase focused study time  
+* Build healthy, consistent learning habits  
 
 ---
 
 ## 💡 Inspiration
-
-Inspired by digital wellbeing tools and student productivity challenges.
+Inspired by digital wellbeing tools and productivity apps for students struggling to maintain focus.  
 
 ---
 
 ## 👨‍💻 Author
-Kavya Sahithi Balusapati
+**Kavya Sahithi Balusapati**
