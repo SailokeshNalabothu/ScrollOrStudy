@@ -18,6 +18,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -61,7 +62,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Refresh daily logic when returning to app
         AppState.load(this)
     }
 
@@ -104,8 +104,16 @@ class MainActivity : AppCompatActivity() {
 
 @Composable
 fun DashboardScreen() {
-    // This will re-calculate if the composition is refreshed
     val currentDate = SimpleDateFormat("EEEE, dd MMMM", Locale.getDefault()).format(Date())
+    
+    val quotes = listOf(
+        "Small steps every day = Big success",
+        "Focus on being productive, not busy.",
+        "Your future self will thank you for today.",
+        "Discipline is choosing between what you want now and what you want most."
+    )
+    val dayOfYear = Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
+    val dailyQuote = quotes[dayOfYear % quotes.size]
 
     Column(
         modifier = Modifier
@@ -115,83 +123,121 @@ fun DashboardScreen() {
     ) {
         Spacer(modifier = Modifier.height(48.dp))
         
-        // 👋 Welcome Section
+        // 🥇 HEADER SECTION
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.Start
         ) {
             Text(
-                text = currentDate,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
-            Text(
-                text = "👋 Welcome",
+                text = "👋 Welcome back!",
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground
             )
             Text(
-                text = if (AppState.isStudyModeActive) "Topper mode ON 📚" else "Stay focused 🔥",
-                fontSize = 16.sp,
+                text = "Stay Focused 🎯",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                text = currentDate,
+                fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.outline
             )
         }
 
-        Spacer(modifier = Modifier.height(40.dp))
+        Spacer(modifier = Modifier.height(32.dp))
 
-        // 📊 Today Stats Header
-        Text(
-            text = "Today Stats",
-            fontSize = 20.sp,
-            fontWeight = FontWeight.SemiBold,
+        // 🥈 TODAY'S STATS CARD
+        Card(
             modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.onSurface
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Stats Cards
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            shape = RoundedCornerShape(24.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
-            CompactTimeCard(
-                label = "📚 Study",
-                seconds = AppState.studyTimeToday,
-                color = Color(0xFF4CAF50),
-                modifier = Modifier.weight(1f)
-            )
-            CompactTimeCard(
-                label = "📱 Scroll",
-                seconds = AppState.scrollTimeToday,
-                color = Color(0xFFF44336),
-                modifier = Modifier.weight(1f)
-            )
+            Column(
+                modifier = Modifier.padding(20.dp),
+                horizontalAlignment = Alignment.Start
+            ) {
+                Text(
+                    text = "📊 Today Stats",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                StatRow(icon = "📖", label = "Study Time", seconds = AppState.studyTimeToday, color = Color(0xFF4CAF50))
+                Spacer(modifier = Modifier.height(12.dp))
+                StatRow(icon = "📱", label = "Scroll Time", seconds = AppState.scrollTimeToday, color = Color(0xFFF44336))
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // 🔥 Streak Section
-        StreakCard(days = AppState.currentStreak)
+        // 🥉 STREAK SECTION
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFFF9800).copy(alpha = 0.1f))
+        ) {
+            Row(
+                modifier = Modifier.padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(text = "🔥", fontSize = 32.sp)
+                Spacer(modifier = Modifier.width(16.dp))
+                Column {
+                    Text(
+                        text = "Streak: ${AppState.currentStreak} days",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color(0xFFFF9800)
+                    )
+                    Text(
+                        text = "You're on fire! Keep it up.",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // 💡 MOTIVATION SECTION
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(text = "💡 Quote:", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(
+                    text = "\"$dailyQuote\"",
+                    fontSize = 16.sp,
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // ▶️ Study Button
+        // ▶ START STUDY BUTTON
         Button(
             onClick = { AppState.isStudyModeActive = !AppState.isStudyModeActive },
             shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = if (AppState.isStudyModeActive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                containerColor = if (AppState.isStudyModeActive) Color(0xFFF44336) else Color(0xFF4CAF50)
             ),
             modifier = Modifier
                 .fillMaxWidth()
                 .height(64.dp)
         ) {
             Text(
-                text = if (AppState.isStudyModeActive) "🛑 Stop Study" else "📖 Start Study",
+                text = if (AppState.isStudyModeActive) "🛑 Stop Study" else "▶ Start Study",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -202,72 +248,28 @@ fun DashboardScreen() {
 }
 
 @Composable
-fun CompactTimeCard(label: String, seconds: Long, color: Color, modifier: Modifier = Modifier) {
+fun StatRow(icon: String, label: String, seconds: Long, color: Color) {
     val hours = seconds / 3600
     val minutes = (seconds % 3600) / 60
     val secs = seconds % 60
-    
     val timeString = if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m ${secs}s"
 
-    Card(
-        modifier = modifier.height(120.dp),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.1f))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.Start
-        ) {
-            Text(text = label, fontSize = 14.sp, color = color.copy(alpha = 0.8f), fontWeight = FontWeight.Medium)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = timeString,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = color
-            )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(text = icon, fontSize = 20.sp)
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(text = label, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-    }
-}
-
-@Composable
-fun StreakCard(days: Int) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(80.dp),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Start
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(Color(0xFFFF9800).copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(text = "🔥", fontSize = 20.sp)
-            }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text(text = "Streak", fontSize = 14.sp, color = MaterialTheme.colorScheme.outline)
-                Text(
-                    text = "You studied $days days in a row",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-        }
+        Text(
+            text = timeString,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = color
+        )
     }
 }
 

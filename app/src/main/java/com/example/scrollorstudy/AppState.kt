@@ -1,9 +1,11 @@
 package com.example.scrollorstudy
 
 import android.content.Context
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.google.firebase.database.FirebaseDatabase
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -50,7 +52,7 @@ object AppState {
             scrollTimeToday = prefs.getLong(KEY_SCROLL_TIME, 0L)
             studyTimeToday = prefs.getLong(KEY_STUDY_TIME, 0L)
         } else {
-            // It's a new day. Evaluate yesterday's performance for streak update.
+            // New day detected.
             if (lastDate == yesterday) {
                 val lastStudy = prefs.getLong(KEY_STUDY_TIME, 0L)
                 val lastScroll = prefs.getLong(KEY_SCROLL_TIME, 0L)
@@ -60,12 +62,14 @@ object AppState {
                 } else {
                     currentStreak = 0
                 }
-            } else if (lastDate != "") {
-                // User missed more than one day
+                
+                // Final sync for the completed day
+                syncToFirebase(lastDate ?: "unknown", lastStudy, lastScroll)
+            } else if (!lastDate.isNullOrEmpty()) {
                 currentStreak = 0
             }
             
-            // Reset daily stats
+            // Reset for the new day
             scrollTimeToday = 0L
             studyTimeToday = 0L
             isStudyModeActive = false
@@ -81,6 +85,32 @@ object AppState {
             putInt(KEY_STREAK, currentStreak)
             putString(KEY_LAST_DATE, getTodayDate())
             apply()
+        }
+        
+        // Sync current progress to Firebase
+        syncToFirebase(getTodayDate(), studyTimeToday, scrollTimeToday)
+    }
+
+    private fun syncToFirebase(date: String, studyTime: Long, scrollTime: Long) {
+        try {
+            Log.d("FIREBASE", "Sending data: Study=$studyTime Scroll=$scrollTime")
+            
+            val database = FirebaseDatabase.getInstance()
+            val myRef = database.getReference("user_data").child(date)
+            
+            val data = mapOf(
+                "studyTime" to studyTime,
+                "scrollTime" to scrollTime,
+                "date" to date,
+                "streak" to currentStreak,
+                "lastUpdated" to System.currentTimeMillis()
+            )
+            
+            myRef.setValue(data).addOnFailureListener { e ->
+                Log.e("FIREBASE", "Failed to sync data: ${e.message}")
+            }
+        } catch (e: Exception) {
+            Log.e("FIREBASE", "Firebase error: ${e.message}")
         }
     }
 }
