@@ -57,6 +57,9 @@ dependencies {
 
     // Navigation
     implementation("androidx.navigation:navigation-compose:2.8.8")
+    
+    // Coil (Image Loading for URL Charts)
+    implementation("io.coil-kt:coil-compose:2.6.0")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

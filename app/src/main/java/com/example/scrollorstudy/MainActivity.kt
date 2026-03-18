@@ -37,10 +37,12 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import coil.compose.AsyncImage
 import com.example.scrollorstudy.ui.theme.ScrollOrStudyTheme
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import java.text.SimpleDateFormat
 import java.util.*
@@ -164,28 +166,60 @@ class MainActivity : AppCompatActivity() {
 @Composable
 fun DashboardScreen(onProfileClick: () -> Unit) {
     val currentDate = SimpleDateFormat("EEEE, dd MMMM", Locale.getDefault()).format(Date())
-    
-    val quotes = listOf(
-        "Small steps every day = Big success",
-        "Focus on being productive, not busy.",
-        "Your future self will thank you for today.",
-        "Discipline is choosing between what you want now and what you want most."
-    )
-    val dayOfYear = Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
-    val dailyQuote = quotes[dayOfYear % quotes.size]
+    val user = FirebaseAuth.getInstance().currentUser
+    var aiMessage by remember { mutableStateOf("Analyzing patterns...") }
+    var aiCoachMessage by remember { mutableStateOf(AppState.cachedAiMotivation ?: "Awaiting AI Coach analysis...") }
+    var focusRank by remember { mutableStateOf("Unranked") }
+    var focusScore by remember { mutableStateOf(0) }
+
+    // Fetch AI Prediction
+    LaunchedEffect(user?.uid) {
+        if (user != null) {
+            val database = AppState.getDatabaseInstance()
+            database.getReference("ai_insights").child(user.uid)
+                .addValueEventListener(object : ValueEventListener {
+                    override fun onDataChange(snapshot: DataSnapshot) {
+                        aiMessage = snapshot.child("message").getValue(String::class.java) ?: "Keep studying to train the AI!"
+                    }
+                    override fun onCancelled(error: DatabaseError) {}
+                })
+                
+            database.getReference("ai_motivation").child(user.uid)
+                .addValueEventListener(object : ValueEventListener {
+                    override fun onDataChange(snapshot: DataSnapshot) {
+                        val msg = snapshot.child("message").getValue(String::class.java)
+                        if (msg != null) {
+                            aiCoachMessage = msg
+                            AppState.cachedAiMotivation = msg
+                        }
+                    }
+                    override fun onCancelled(error: DatabaseError) {}
+                })
+                
+            // Fetch Leaderboard Rank
+            database.getReference("leaderboard").child(user.uid)
+                .addValueEventListener(object : ValueEventListener {
+                    override fun onDataChange(snapshot: DataSnapshot) {
+                        focusRank = snapshot.child("rank").getValue(String::class.java) ?: "Unranked"
+                        focusScore = snapshot.child("score").getValue(Int::class.java) ?: 0
+                    }
+                    override fun onCancelled(error: DatabaseError) {}
+                })
+        }
+    }
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Scroll or Study", fontWeight = FontWeight.Bold) },
+                title = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Scroll or Study", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Text(currentDate, fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
+                    }
+                },
                 actions = {
                     IconButton(onClick = onProfileClick) {
-                        Icon(
-                            imageVector = Icons.Default.AccountCircle,
-                            contentDescription = "Profile",
-                            modifier = Modifier.size(32.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
+                        Icon(Icons.Default.AccountCircle, contentDescription = "Profile", modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
                     }
                 }
             )
@@ -198,148 +232,139 @@ fun DashboardScreen(onProfileClick: () -> Unit) {
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            
-            // 🥇 HEADER SECTION
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-                horizontalAlignment = Alignment.Start
-            ) {
-                val displayName = if (AppState.userName.isNotEmpty()) AppState.userName else "Student"
+            // WELCOME MESSAGE
+            val displayName = if (AppState.userName.isNotEmpty()) AppState.userName else "Student"
+            Box(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), contentAlignment = Alignment.CenterStart) {
                 Text(
-                    text = "👋 Welcome back, $displayName!",
-                    fontSize = 24.sp,
+                    text = "👋 Welcome, $displayName",
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
-                Text(
-                    text = "Stay Focused 🎯",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = currentDate,
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.outline
-                )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 🥈 TODAY'S STATS CARD
+            // RANK CARD
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(28.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
+            ) {
+                Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.tertiary.copy(alpha=0.2f), CircleShape), contentAlignment = Alignment.Center) {
+                        Text(text = "🏆", fontSize = 20.sp)
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = "Focus Rank", fontSize = 12.sp, color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha=0.8f))
+                        Text(text = focusRank, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(text = "Score", fontSize = 12.sp, color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha=0.8f))
+                        Text(text = "$focusScore", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // AI CARDS
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
             ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.Start
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.DateRange, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.Top) {
+                        Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Today's Progress",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.height(24.dp))
-                    
-                    StatRowPro(icon = Icons.Default.Edit, label = "Study Time", seconds = AppState.studyTimeToday, color = Color(0xFF4CAF50))
-                    Spacer(modifier = Modifier.height(20.dp))
-                    StatRowPro(icon = Icons.Default.PlayArrow, label = "Scroll Time", seconds = AppState.scrollTimeToday, color = Color(0xFFF44336))
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // 🥉 STREAK CARD
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(28.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFFF9800).copy(alpha = 0.15f))
-            ) {
-                Row(
-                    modifier = Modifier.padding(20.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier.size(56.dp).background(Color(0xFFFF9800).copy(alpha = 0.2f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(text = "🔥", fontSize = 28.sp)
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text(
-                            text = "${AppState.currentStreak} Day Streak",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color(0xFFFF9800)
-                        )
-                        val streakMessage = when {
-                            AppState.currentStreak >= 30 -> "Unstoppable! 🏆"
-                            AppState.currentStreak >= 7 -> "Amazing consistency! ✨"
-                            AppState.currentStreak >= 3 -> "You're building momentum! 🚀"
-                            AppState.currentStreak >= 1 -> "Good start! 🔥"
-                            else -> "Start your journey today! 💪"
+                        Column {
+                            Text(text = "AI Analysis", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            Text(text = aiMessage, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top=2.dp))
                         }
-                        Text(
-                            text = streakMessage,
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(verticalAlignment = Alignment.Top) {
+                        Icon(Icons.Default.Star, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(text = "Recommendation", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                            Text(text = aiCoachMessage, fontSize = 13.sp, fontWeight = FontWeight.Medium, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top=2.dp))
+                        }
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // 💡 QUOTE SECTION
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.2f))
-            ) {
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // PERFORMANCE GRID
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Study Time
+                Card(modifier = Modifier.weight(1f), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9))) {
+                    Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.Start) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.size(28.dp).background(Color(0xFF4CAF50).copy(alpha=0.2f), CircleShape), contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.Edit, contentDescription = null, tint = Color(0xFF2E7D32), modifier = Modifier.size(14.dp))
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = "Study", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Color(0xFF2E7D32))
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        val studyMins = AppState.studyTimeToday / 60
+                        val studyHrs = studyMins / 60
+                        val formatStudy = if (studyHrs > 0) "${studyHrs}h ${studyMins % 60}m" else "${studyMins}m"
+                        Text(text = formatStudy, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                    }
+                }
+                
+                // Scroll Time
+                Card(modifier = Modifier.weight(1f), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE))) {
+                    Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.Start) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.size(28.dp).background(Color(0xFFF44336).copy(alpha=0.2f), CircleShape), contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFC62828), modifier = Modifier.size(14.dp))
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = "Scroll", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Color(0xFFC62828))
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        val scrollMins = AppState.scrollTimeToday / 60
+                        val scrollHrs = scrollMins / 60
+                        val formatScroll = if (scrollHrs > 0) "${scrollHrs}h ${scrollMins % 60}m" else "${scrollMins}m"
+                        Text(text = formatScroll, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFFC62828))
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // STREAK ROW
+            Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0))) {
                 Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.secondary)
+                    Box(modifier = Modifier.size(36.dp).background(Color(0xFFFF9800).copy(alpha=0.2f), CircleShape), contentAlignment = Alignment.Center) {
+                        Text(text = "🔥", fontSize = 18.sp)
+                    }
                     Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "\"$dailyQuote\"",
-                        fontSize = 15.sp,
-                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
+                    Column {
+                        Text(text = "${AppState.currentStreak} Day Streak", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE65100))
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // ▶ START STUDY BUTTON
+            // COMMIT BUTTON
             Button(
                 onClick = { AppState.isStudyModeActive = !AppState.isStudyModeActive },
                 shape = RoundedCornerShape(20.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (AppState.isStudyModeActive) Color(0xFFF44336) else Color(0xFF4CAF50)
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(64.dp)
+                colors = ButtonDefaults.buttonColors(containerColor = if (AppState.isStudyModeActive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary),
+                modifier = Modifier.fillMaxWidth().height(56.dp)
             ) {
                 Icon(if (AppState.isStudyModeActive) Icons.Default.Close else Icons.Default.PlayArrow, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (AppState.isStudyModeActive) "Stop Study Mode" else "Start Study Mode",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Text(text = if (AppState.isStudyModeActive) "Stop Study Session" else "Start Study Session", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
             
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
@@ -352,28 +377,34 @@ fun ParentDashboardScreen(onProfileClick: () -> Unit) {
     var studentScrollTime by remember { mutableStateOf(0L) }
     var studentStreak by remember { mutableStateOf(0) }
     var studentName by remember { mutableStateOf("Loading...") }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var weeklyChartUrl by remember { mutableStateOf<String?>(null) }
 
-    // Fetch live student data
     LaunchedEffect(Unit) {
         val database = AppState.getDatabaseInstance()
         val studentRef = database.getReference("user_data").child(AppState.studentUidForParent).child(currentDate)
         val statsRef = database.getReference("user_stats").child(AppState.studentUidForParent)
+        val weeklyRef = database.getReference("weekly_reports").child(AppState.studentUidForParent).child("latest_chart_url")
 
         studentRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 studentStudyTime = snapshot.child("studyTime").getValue(Long::class.java) ?: 0L
                 studentScrollTime = snapshot.child("scrollTime").getValue(Long::class.java) ?: 0L
-                Log.d("PARENT_SYNC", "Study: $studentStudyTime Scroll: $studentScrollTime")
             }
-            override fun onCancelled(error: DatabaseError) {
-                Log.e("PARENT_SYNC", "Error: ${error.message}")
-            }
+            override fun onCancelled(error: DatabaseError) {}
         })
 
         statsRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 studentStreak = snapshot.child("streak").getValue(Int::class.java) ?: 0
                 studentName = snapshot.child("userName").getValue(String::class.java) ?: "Student"
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+
+        weeklyRef.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                weeklyChartUrl = snapshot.getValue(String::class.java)
             }
             override fun onCancelled(error: DatabaseError) {}
         })
@@ -392,62 +423,59 @@ fun ParentDashboardScreen(onProfileClick: () -> Unit) {
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp)) {
-            
-            Text(
-                text = "Currently Monitoring",
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.padding(top = 16.dp)
-            )
-            Text(
-                text = studentName,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold
-            )
-
+            Text(text = "Currently Monitoring", fontSize = 14.sp, color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(top = 16.dp))
+            Text(text = studentName, fontSize = 24.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(24.dp))
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(28.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-            ) {
+            Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
                 Column(modifier = Modifier.padding(24.dp)) {
-                    Text(text = "Student Progress Today", fontWeight = FontWeight.SemiBold)
-                    Spacer(modifier = Modifier.height(24.dp))
                     StatRowPro(icon = Icons.Default.Edit, label = "Study Time", seconds = studentStudyTime, color = Color(0xFF4CAF50))
                     Spacer(modifier = Modifier.height(20.dp))
                     StatRowPro(icon = Icons.Default.PlayArrow, label = "Scroll Time", seconds = studentScrollTime, color = Color(0xFFF44336))
                 }
             }
-
             Spacer(modifier = Modifier.height(20.dp))
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(28.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFFF9800).copy(alpha = 0.15f))
-            ) {
+            Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFFFF9800).copy(alpha = 0.15f))) {
                 Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier.size(56.dp).background(Color(0xFFFF9800).copy(alpha = 0.2f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(text = "🔥", fontSize = 28.sp)
-                    }
+                    Text(text = "🔥", fontSize = 28.sp)
                     Spacer(modifier = Modifier.width(16.dp))
                     Text(text = "$studentStreak Day Streak", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFF9800))
                 }
             }
             
+            if (weeklyChartUrl != null) {
+                Spacer(modifier = Modifier.height(20.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(28.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
+                ) {
+                    Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(text = "📊 Weekly Performance", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        AsyncImage(
+                            model = weeklyChartUrl,
+                            contentDescription = "Weekly Study vs. Scroll Chart",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(220.dp)
+                                .clip(RoundedCornerShape(16.dp)),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        TextButton(
+                            onClick = { 
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(weeklyChartUrl))
+                                context.startActivity(intent)
+                            }
+                        ) {
+                            Text("Open Full Size", fontSize = 14.sp)
+                        }
+                    }
+                }
+            }
+            
             Spacer(modifier = Modifier.weight(1f))
-            Text(
-                text = "Live monitoring active. Data updates in real-time.",
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
-                textAlign = TextAlign.Center
-            )
+            Text(text = "Live monitoring active. Data updates in real-time.", fontSize = 12.sp, color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), textAlign = TextAlign.Center)
         }
     }
 }
@@ -489,75 +517,23 @@ fun ProfileScreen(onBack: () -> Unit, onLogout: () -> Unit, onDeleteAccount: () 
             )
         }
     ) { padding ->
-        Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                modifier = Modifier.size(100.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = if (editName.isNotEmpty()) editName.first().uppercase() else "U",
-                    fontSize = 40.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(modifier = Modifier.size(100.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape), contentAlignment = Alignment.Center) {
+                Text(text = if (editName.isNotEmpty()) editName.first().uppercase() else "U", fontSize = 40.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
             }
-            
             Spacer(modifier = Modifier.height(24.dp))
-            
-            OutlinedTextField(
-                value = editName,
-                onValueChange = { editName = it; AppState.userName = it; AppState.save(context) },
-                label = { Text("Name") },
-                modifier = Modifier.fillMaxWidth(),
-                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
-                shape = RoundedCornerShape(16.dp)
-            )
-            
+            OutlinedTextField(value = editName, onValueChange = { editName = it; AppState.userName = it; AppState.save(context) }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth(), leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) }, shape = RoundedCornerShape(16.dp))
             Spacer(modifier = Modifier.height(16.dp))
-            
-            OutlinedTextField(
-                value = AppState.userEmail,
-                onValueChange = {},
-                label = { Text("Email Address") },
-                modifier = Modifier.fillMaxWidth(),
-                readOnly = true,
-                enabled = false,
-                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
-                shape = RoundedCornerShape(16.dp)
-            )
-            
+            OutlinedTextField(value = AppState.userEmail, onValueChange = {}, label = { Text("Email Address") }, modifier = Modifier.fillMaxWidth(), readOnly = true, enabled = false, leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) }, shape = RoundedCornerShape(16.dp))
             if (AppState.userRole == "student" && user != null) {
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(text = "Parent Link ID", modifier = Modifier.fillMaxWidth(), fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = user.uid,
-                    onValueChange = {},
-                    readOnly = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    trailingIcon = {
-                        IconButton(onClick = { 
-                            clipboardManager.setText(AnnotatedString(user.uid))
-                            Toast.makeText(context, "ID Copied!", Toast.LENGTH_SHORT).show()
-                        }) {
-                            Icon(Icons.Default.Share, contentDescription = "Copy")
-                        }
-                    }
-                )
+                OutlinedTextField(value = user.uid, onValueChange = {}, readOnly = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), trailingIcon = { IconButton(onClick = { clipboardManager.setText(AnnotatedString(user.uid)); Toast.makeText(context, "ID Copied!", Toast.LENGTH_SHORT).show() }) { Icon(Icons.Default.Share, contentDescription = "Copy") } })
                 Text(text = "Share this ID with your parent to link accounts.", fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
             }
-            
             Spacer(modifier = Modifier.height(32.dp))
-            
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Settings, contentDescription = null)
                     Spacer(modifier = Modifier.width(16.dp))
@@ -565,20 +541,12 @@ fun ProfileScreen(onBack: () -> Unit, onLogout: () -> Unit, onDeleteAccount: () 
                 }
                 Switch(checked = AppState.isDarkMode, onCheckedChange = { AppState.isDarkMode = it; AppState.save(context) })
             }
-            
             Spacer(modifier = Modifier.weight(1f))
-            
-            Button(
-                onClick = onLogout,
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
-                shape = RoundedCornerShape(16.dp)
-            ) {
+            Button(onClick = onLogout, modifier = Modifier.fillMaxWidth().height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurfaceVariant), shape = RoundedCornerShape(16.dp)) {
                 Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Sign Out")
             }
-
             if (AppState.userRole == "student") {
                 Spacer(modifier = Modifier.height(12.dp))
                 TextButton(onClick = { showDeleteDialog = true }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
@@ -587,7 +555,6 @@ fun ProfileScreen(onBack: () -> Unit, onLogout: () -> Unit, onDeleteAccount: () 
                     Text("Delete Account Permanently")
                 }
             }
-            
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
@@ -599,27 +566,19 @@ fun StatRowPro(icon: ImageVector, label: String, seconds: Long, color: Color) {
     val minutes = (seconds % 3600) / 60
     val secs = seconds % 60
     val timeString = if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m ${secs}s"
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier.size(40.dp).background(color.copy(alpha = 0.1f), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = color)
-            }
+            Box(modifier = Modifier.size(40.dp).background(color.copy(alpha = 0.1f), CircleShape), contentAlignment = Alignment.Center) { Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = color) }
             Spacer(modifier = Modifier.width(16.dp))
             Text(text = label, fontSize = 16.sp, fontWeight = FontWeight.Medium)
         }
-        Text(
-            text = timeString,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            color = color
-        )
+        Text(text = timeString, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = color)
     }
+}
+
+@Composable
+fun formatTimeCompact(seconds: Long): String {
+    val h = seconds / 3600
+    val m = (seconds % 3600) / 60
+    return if (h > 0) "${h}h ${m}m" else "${m}m"
 }

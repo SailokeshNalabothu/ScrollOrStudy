@@ -36,6 +36,7 @@ object AppState {
     
     // Sync Status for UI feedback
     var lastSyncStatus by mutableStateOf("Ready")
+    var cachedAiMotivation: String? = null
 
     const val MIN_STUDY_TIME = 1800L // 30 minutes threshold
     private const val DATABASE_URL = "https://scrollorstudy-default-rtdb.asia-southeast1.firebasedatabase.app"

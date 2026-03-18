@@ -14,6 +14,7 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.widget.Button
 import android.widget.TextView
+import com.google.firebase.auth.FirebaseAuth
 
 class AppAccessibilityService : AccessibilityService() {
 
@@ -74,6 +75,7 @@ class AppAccessibilityService : AccessibilityService() {
                                 Log.d("TRACKING", "Scrolling: $distractionSeconds sec | Total Today: ${AppState.scrollTimeToday}s")
 
                                 if (distractionSeconds >= 15) {
+                                    Log.d("TRACKING", "Threshold reached! Showing motivation popup.")
                                     showOverlay()
                                 }
                             }
@@ -118,6 +120,12 @@ class AppAccessibilityService : AccessibilityService() {
             if (packageName == currentApp) return
             
             Log.d("TRACKING", "App Changed: $currentApp -> $packageName")
+            
+            // 🔥 AI PREDICTOR: Force push event for testing
+            if (distractingApps.contains(packageName)) {
+                logScrollingEventToFirebase(packageName)
+            }
+
             currentApp = packageName
             AppState.currentApp = packageName
             
@@ -126,6 +134,25 @@ class AppAccessibilityService : AccessibilityService() {
                 removeOverlay()
             }
         }
+    }
+
+    private fun logScrollingEventToFirebase(appName: String) {
+        val user = FirebaseAuth.getInstance().currentUser ?: return
+        val database = AppState.getDatabaseInstance()
+        val timestamp = System.currentTimeMillis()
+        
+        Log.d("FIREBASE_AI", "Logging event for $appName at $timestamp")
+        
+        database.getReference("scrolling_events")
+            .child(user.uid)
+            .push()
+            .setValue(timestamp)
+            .addOnSuccessListener {
+                Log.d("FIREBASE_AI", "Successfully pushed to scrolling_events")
+            }
+            .addOnFailureListener {
+                Log.e("FIREBASE_AI", "Failed to push: ${it.message}")
+            }
     }
 
     private fun showOverlay() {
@@ -137,7 +164,7 @@ class AppAccessibilityService : AccessibilityService() {
                 overlayView = inflater.inflate(R.layout.overlay_view, null)
 
                 val quoteView = overlayView?.findViewById<TextView>(R.id.tvMotivationQuote)
-                quoteView?.text = MotivationEngine.getRandomScrollQuote()
+                quoteView?.text = AppState.cachedAiMotivation ?: MotivationEngine.getRandomScrollQuote()
 
                 val params = WindowManager.LayoutParams(
                     WindowManager.LayoutParams.MATCH_PARENT,
