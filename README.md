@@ -1,105 +1,86 @@
 # 📱 ScrollOrStudy
 
-**ScrollOrStudy** is a smart Android productivity app designed to help students track their study time versus scrolling habits, stay focused, and build consistent learning routines.  
+**ScrollOrStudy** is a smart Android productivity ecosystem designed to help students track their study time versus scrolling habits, stay focused, and build consistent learning routines powered by advanced AI integrations.
 
 ---
 
-## 🚀 Features Implemented (Completed)
+## 🚀 Features Implemented 
 
 ### 🧠 Real-Time App Detection
-* Detects which app the user is actively using  
-* Uses Accessibility Service for continuous background monitoring  
+* Detects which application the user is actively engaging with.
+* Uses an Android **Accessibility Service** for continuous, low-latency background monitoring.
 
 ### ⏱️ Time Tracking System
-* Tracks **Scroll Time** (social media apps like Instagram)  
-* Tracks **Study Time** (educational apps like Google Classroom, GitHub, or manual study)  
-* Timer counts accurately even if the user switches apps  
-* Verified live via Logcat and in-app UI  
+* Tracks **Scroll Time** (social media apps like Instagram, TikTok).
+* Tracks **Study Time** (educational apps like Google Classroom, GitHub, or manual focus mode).
+* Timer counts accurately even during app-switching, continuously synced to Firebase.
 
 ### 📱 App Categorization System
-* Apps classified into three categories:  
-  * **Distracting Apps:** counted as *Scroll Time*  
-  * **Study Apps:** counted as *Study Time*  
-  * **Neutral Apps:** ignored in tracking  
+* Apps are classified into three core behavior categories:  
+  * **Distracting Apps:** Actively increments *Scroll Time*.
+  * **Study Apps:** Actively increments *Study Time*.  
+  * **Neutral Apps:** Ignored to prevent false positives.
 
-### 🚨 Smart Alert System
-* Shows a notification popup after 15 seconds of continuous scrolling  
-* Encourages users to return to study mode  
-* Works in real-time without crashing  
+### 🚨 Smart AI Alert System & Motivation Engine
+* Triggers a real-time overlay notification popup when distraction thresholds are exceeded.
+* **Powered by Google Gemini AI:** Instead of generic quotes, the app fetches dynamically generated, highly personalized motivational advice based on the user's exact daily study-to-scroll ratio.
 
-### 📊 Daily Tracking Dashboard
-* Clean UI showing today’s stats:
+### 📊 Professional Developer Dashboard
+* A clean, modern UI featuring today’s live statistics:
   * 📚 Study Time  
-  * 📱 Scroll Time  
-* Counts match logcat times  
-* UI includes “Welcome”, “Stay Focused”, live date, and **Start Study** button  
+  * 📱 Scroll Time
+  * 🔥 Live Streak Counter  
+* Features a unified "Start/Stop Study Session" architecture for manual focus overriding.
 
-### 🔥 Streak System
-* Tracks daily study consistency  
-* Displays streak count in the UI  
+### 🏆 Mathematical Focus Leaderboard
+* Processes historical user data through a custom algorithm [(Study / Total Time) * Streak](cci:1://file:///c:/Users/sailo/AndroidStudioProjects/ScrollOrStudy2/app/src/main/java/com/example/scrollorstudy/AppAccessibilityService.kt:64:12-106:13).
+* Assigns dynamic, competitive global ranks (Bronze, Silver, Gold, Diamond, Grandmaster) displayed prominently on the student dashboard.
 
-### ☁️ Firebase Integration (Basic)
-* Firebase Realtime Database connected  
-* Daily Study and Scroll data synced to the cloud  
-* Data stored under `user_data/<date>` structure  
-* Live sync works every 10 seconds  
-* Day-end sync implemented for previous day  
-* Database rules currently in **test mode**  
+### 🤖 AI Binge Predictor (Python Engine)
+* A remote Google Colab data engine analyzes historical usage timestamps to mathematically predict upcoming distraction windows.
+* Delivers preemptive warnings directly to the Android client (e.g., "You usually scroll at 8 PM. Start a study session now.").
+
+### 👨‍👩‍👧 Dedicated Parent Dashboard & Reports
+* Separate login infrastructure specifically for Parents, securely linked to Student accounts via unique authorization keys.
+* **Automated Data Visualization:** Integrates with the QuickChart API to automatically generate and display weekly visual bar charts comparing Study vs. Scroll habits over the last 7 days.
+
+### ☁️ Cloud Architecture (Firebase Integration)
+* **Firebase Realtime Database** fully connected.
+* Daily Study and Scroll matrices are synced to the cloud seamlessly.
+* Highly structured JSON tree separating `user_data`, `user_stats`, `ai_insights`, and `leaderboard` nodes.
 
 ---
 
-## 🧩 How It Works (Current Implementation)
-1. App continuously monitors foreground app using Accessibility Service  
-2. Matches the app against defined categories:  
-   * Distracting → increments Scroll Time  
-   * Study → increments Study Time  
-   * Neutral → ignored  
-3. Timer updates every second  
-4. Alerts trigger when distraction exceeds 15 seconds  
-5. Data is stored locally and synced to Firebase in real-time  
-6. UI displays live stats and streak  
+## 🧩 How It Works (System Flow)
+1. The Android client actively monitors the foreground application state via the Accessibility Service.
+2. The logic matches the active app against predefined categories, updating local state variables.
+3. Every 10 seconds, state vectors (Study Time, Scroll Time) are synchronized to the Firebase Realtime Database.
+4. A remote Python Cloud Engine (Colab) digests this data to trigger Gemini AI prompts and calculate mathematical rankings.
+5. AI insights, weekly chart URIs, and leaderboard ranks are streamed back to the Android client in real-time, instantly updating the Jetpack Compose UI.
 
 ---
 
 ## 🛠️ Tech Stack
-* **Language:** Kotlin  
+* **Language:** Kotlin (Android), Python (AI Engine)
+* **UI Framework:** Jetpack Compose (Material 3)
 * **Platform:** Android (Android Studio)  
-* **Core APIs:** Accessibility Service, Foreground Service, Handlers  
-* **Storage:** SharedPreferences (local), Firebase Realtime Database (cloud)  
-
----
-
-## 📌 Current Status
-✅ Core app tracking system completed  
-✅ Real-time app detection implemented  
-✅ Study and scroll timers working perfectly  
-✅ Alerts functioning after 15 seconds of scrolling  
-✅ UI dashboard implemented (Welcome, Stats, Streak, Start Study button)  
-✅ Firebase Realtime Database connected and syncing data  
-🔄 Streak system partially implemented (UI shows streak, logic partially done)  
-
----
-
-## 🚀 Upcoming Features
-* 🎯 Motivation Engine – daily quotes, fun reminders, encouragement messages  
-* 🔥 Advanced Streak System – automated daily reset, long-term tracking  
-* 👨‍👩‍👧 Parent Dashboard – monitor student study habits  
-* 🤖 AI-based insights using Google Colab  
-* 📊 Weekly & Monthly Reports – visualize study vs scrolling patterns  
+* **Core APIs:** Accessibility Service, Foreground Service, Intent Handling
+* **Cloud Solutions:** Firebase Realtime Database, Firebase Authentication
+* **Third-Party APIs:** Google Gemini LLM API, QuickChart.io API
 
 ---
 
 ## 🎯 Project Goal
-* Reduce unnecessary scrolling  
-* Increase focused study time  
-* Build healthy, consistent learning habits  
+* Reduce unconscious social media consumption.
+* Increase structured, focused study blocks.
+* Build healthy, consistent learning habits through advanced gamification and AI-driven accountability.
 
 ---
 
 ## 💡 Inspiration
-Inspired by digital wellbeing tools and productivity apps for students struggling to maintain focus.  
+Inspired by digital wellbeing tools and the necessity for a truly uncompromising, intelligent productivity ecosystem for students struggling to maintain focus in the modern attention economy.
 
 ---
 
 ## 👨‍💻 Author
-**Kavya Sahithi Balusapati**
+*k
