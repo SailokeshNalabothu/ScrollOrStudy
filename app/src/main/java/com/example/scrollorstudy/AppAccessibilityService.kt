@@ -13,6 +13,7 @@ import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.widget.Button
+import android.widget.TextView
 
 class AppAccessibilityService : AccessibilityService() {
 
@@ -22,6 +23,8 @@ class AppAccessibilityService : AccessibilityService() {
     private var mainRunnable: Runnable? = null
     private var overlayView: View? = null
     private var windowManager: WindowManager? = null
+    
+    private var syncCounter = 0
 
     private val distractingApps = listOf(
         "com.google.android.youtube",
@@ -40,7 +43,6 @@ class AppAccessibilityService : AccessibilityService() {
         "com.google.android.apps.docs.editors.sheets"
     )
 
-    // System and Neutral apps are ignored by the logic below
     private val systemPackages = listOf(
         "android",
         "com.android.systemui",
@@ -64,7 +66,6 @@ class AppAccessibilityService : AccessibilityService() {
                 
                 if (activeApp != null) {
                     when {
-                        // 1. Distraction Tracking
                         distractingApps.contains(activeApp) -> {
                             AppState.scrollTimeToday++
                             
@@ -73,13 +74,11 @@ class AppAccessibilityService : AccessibilityService() {
                                 Log.d("TRACKING", "Scrolling: $distractionSeconds sec | Total Today: ${AppState.scrollTimeToday}s")
 
                                 if (distractionSeconds >= 15) {
-                                    Log.d("TRACKING", "Threshold reached! Showing overlay.")
                                     showOverlay()
                                 }
                             }
                         }
                         
-                        // 2. Useful Apps Tracking (Study Time)
                         usefulApps.contains(activeApp) -> {
                             AppState.studyTimeToday++
                             distractionSeconds = 0
@@ -87,9 +86,7 @@ class AppAccessibilityService : AccessibilityService() {
                             Log.d("TRACKING", "Studying in $activeApp | Total Today: ${AppState.studyTimeToday}s")
                         }
                         
-                        // 3. Neutral/Other Apps
                         else -> {
-                            // Don't count time, just reset distraction counter and remove overlay
                             if (!systemPackages.contains(activeApp) && activeApp != packageName) {
                                 distractionSeconds = 0
                                 removeOverlay()
@@ -98,10 +95,10 @@ class AppAccessibilityService : AccessibilityService() {
                     }
                 }
                 
-                // Save periodically (every 10 seconds of activity)
-                if ((AppState.scrollTimeToday > 0 && AppState.scrollTimeToday % 10 == 0L) || 
-                    (AppState.studyTimeToday > 0 && AppState.studyTimeToday % 10 == 0L)) {
+                syncCounter++
+                if (syncCounter >= 2) {
                     AppState.save(this@AppAccessibilityService)
+                    syncCounter = 0
                 }
 
                 handler.postDelayed(this, 1000)
@@ -114,7 +111,6 @@ class AppAccessibilityService : AccessibilityService() {
         if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             val packageName = event.packageName?.toString() ?: return
 
-            // Ignore internal switches to system UI so we don't drop tracking of the main app
             if (systemPackages.contains(packageName) || packageName == this.packageName) {
                 return
             }
@@ -125,7 +121,6 @@ class AppAccessibilityService : AccessibilityService() {
             currentApp = packageName
             AppState.currentApp = packageName
             
-            // If user manually switched to a non-distraction app, cleanup
             if (!distractingApps.contains(packageName)) {
                 distractionSeconds = 0
                 removeOverlay()
@@ -140,6 +135,9 @@ class AppAccessibilityService : AccessibilityService() {
             try {
                 val inflater = getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
                 overlayView = inflater.inflate(R.layout.overlay_view, null)
+
+                val quoteView = overlayView?.findViewById<TextView>(R.id.tvMotivationQuote)
+                quoteView?.text = MotivationEngine.getRandomScrollQuote()
 
                 val params = WindowManager.LayoutParams(
                     WindowManager.LayoutParams.MATCH_PARENT,
@@ -157,10 +155,9 @@ class AppAccessibilityService : AccessibilityService() {
                 params.gravity = Gravity.CENTER
 
                 windowManager?.addView(overlayView, params)
-                Log.d("TRACKING", "Overlay shown")
+                Log.d("TRACKING", "Motivation Overlay shown")
 
                 overlayView?.findViewById<Button>(R.id.btnClose)?.setOnClickListener {
-                    Log.d("TRACKING", "User clicked Close on overlay")
                     removeOverlay()
                     distractionSeconds = 0
                 }

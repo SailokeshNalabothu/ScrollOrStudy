@@ -2,20 +2,37 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#AA000000"
+    android:background="#DD000000"
     android:gravity="center"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:padding="32.dp">
 
     <TextView
+        android:id="@+id/tvAlertHeader"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Stop Scrolling!"
-        android:textSize="24sp"
-        android:textColor="#FFFFFF"/>
+        android:text="⚠️ Stop Scrolling!"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:layout_marginBottom="16dp"/>
+
+    <TextView
+        android:id="@+id/tvMotivationQuote"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Focus now, relax later. ✨"
+        android:textSize="18sp"
+        android:textColor="#EEEEEE"
+        android:gravity="center"
+        android:layout_marginBottom="32dp"/>
 
     <Button
         android:id="@+id/btnClose"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Back to Study"/>
+        android:text="Back to Study 📚"
+        android:paddingHorizontal="24dp"
+        android:paddingVertical="12dp"
+        android:backgroundTint="#4CAF50"/>
 </LinearLayout>

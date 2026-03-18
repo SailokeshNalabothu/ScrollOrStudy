@@ -48,8 +48,15 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     
     // Firebase
-    implementation(platform("com.google.firebase:firebase-bom:33.10.0"))
+    implementation(platform("com.google.firebase:firebase-bom:34.10.0"))
     implementation("com.google.firebase:firebase-database")
+    implementation("com.google.firebase:firebase-auth")
+    
+    // Google Sign In
+    implementation(libs.play.services.auth)
+
+    // Navigation
+    implementation("androidx.navigation:navigation-compose:2.8.8")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
