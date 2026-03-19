@@ -164,7 +164,8 @@ class AppAccessibilityService : AccessibilityService() {
                 overlayView = inflater.inflate(R.layout.overlay_view, null)
 
                 val quoteView = overlayView?.findViewById<TextView>(R.id.tvMotivationQuote)
-                quoteView?.text = AppState.cachedAiMotivation ?: MotivationEngine.getRandomScrollQuote()
+                val baseMotivation = AppState.cachedAiMotivation ?: MotivationEngine.getRandomScrollQuote()
+                val closeBtn = overlayView?.findViewById<Button>(R.id.btnClose)
 
                 val params = WindowManager.LayoutParams(
                     WindowManager.LayoutParams.MATCH_PARENT,
@@ -184,9 +185,32 @@ class AppAccessibilityService : AccessibilityService() {
                 windowManager?.addView(overlayView, params)
                 Log.d("TRACKING", "Motivation Overlay shown")
 
-                overlayView?.findViewById<Button>(R.id.btnClose)?.setOnClickListener {
-                    removeOverlay()
-                    distractionSeconds = 0
+                if (AppState.isHardcoreModeActive) {
+                    closeBtn?.visibility = View.GONE
+                    var countdown = 5
+                    val countdownRunnable = object : Runnable {
+                        override fun run() {
+                            if (overlayView == null) return
+                            if (countdown > 0) {
+                                quoteView?.text = "$baseMotivation\n\n⚠️ HARDCORE MODE: App closing in ${countdown}s..."
+                                countdown--
+                                handler.postDelayed(this, 1000)
+                            } else {
+                                Log.d("TRACKING", "Hardcore Mode delayed block! Forcing home screen.")
+                                performGlobalAction(GLOBAL_ACTION_HOME)
+                                removeOverlay()
+                                distractionSeconds = 0
+                            }
+                        }
+                    }
+                    handler.post(countdownRunnable)
+                } else {
+                    quoteView?.text = baseMotivation
+                    closeBtn?.visibility = View.VISIBLE
+                    closeBtn?.setOnClickListener {
+                        removeOverlay()
+                        distractionSeconds = 0
+                    }
                 }
             } catch (e: Exception) {
                 Log.e("TRACKING", "Error showing overlay: ${e.message}")

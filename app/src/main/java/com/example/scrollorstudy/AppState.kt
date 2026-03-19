@@ -21,6 +21,7 @@ object AppState {
     
     // Manual Study Mode
     var isStudyModeActive by mutableStateOf(false)
+    var isHardcoreModeActive by mutableStateOf(false)
 
     // Streak
     var currentStreak by mutableStateOf(0)
@@ -48,6 +49,7 @@ object AppState {
     private const val KEY_LAST_DATE = "last_date"
     private const val KEY_LAST_STUDY_DATE = "last_study_date"
     private const val KEY_DARK_MODE = "is_dark_mode"
+    private const val KEY_HARDCORE_MODE = "is_hardcore_mode"
     private const val KEY_USER_NAME = "user_name"
     private const val KEY_USER_ROLE = "user_role"
     private const val KEY_STUDENT_UID = "student_uid"
@@ -71,6 +73,7 @@ object AppState {
         
         currentStreak = prefs.getInt(KEY_STREAK, 0)
         isDarkMode = prefs.getBoolean(KEY_DARK_MODE, false)
+        isHardcoreModeActive = prefs.getBoolean(KEY_HARDCORE_MODE, false)
         userName = prefs.getString(KEY_USER_NAME, "") ?: ""
         userRole = prefs.getString(KEY_USER_ROLE, "student") ?: "student"
         studentUidForParent = prefs.getString(KEY_STUDENT_UID, "") ?: ""
@@ -130,6 +133,7 @@ object AppState {
             putInt(KEY_STREAK, currentStreak)
             putString(KEY_LAST_DATE, today)
             putBoolean(KEY_DARK_MODE, isDarkMode)
+            putBoolean(KEY_HARDCORE_MODE, isHardcoreModeActive)
             putString(KEY_USER_NAME, userName)
             putString(KEY_USER_ROLE, userRole)
             putString(KEY_STUDENT_UID, studentUidForParent)

@@ -365,6 +365,27 @@ fun DashboardScreen(onProfileClick: () -> Unit) {
             }
             
             Spacer(modifier = Modifier.height(16.dp))
+            
+            // HARDCORE MODE TOGGLE
+            val context = androidx.compose.ui.platform.LocalContext.current
+            Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha=0.3f))) {
+                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = "Hardcore Mode", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(text = "Force-close apps instead of showing popups.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=0.8f))
+                    }
+                    Switch(
+                        checked = AppState.isHardcoreModeActive,
+                        onCheckedChange = { 
+                            AppState.isHardcoreModeActive = it 
+                            AppState.save(context)
+                        },
+                        colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.error, checkedTrackColor = MaterialTheme.colorScheme.errorContainer)
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
