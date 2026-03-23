@@ -27,8 +27,11 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class LoginActivity : AppCompatActivity() {
+    private val preferencesManager by lazy { (application as ScrollOrStudyApplication).container.preferencesManager }
     private lateinit var auth: FirebaseAuth
     private lateinit var googleSignInClient: GoogleSignInClient
     private lateinit var launcher: ActivityResultLauncher<Intent>
@@ -74,9 +77,10 @@ class LoginActivity : AppCompatActivity() {
         auth.signInWithCredential(credential)
             .addOnCompleteListener(this) { task ->
                 if (task.isSuccessful) {
-                    AppState.userRole = "student"
-                    AppState.save(this)
-                    startMainActivity()
+                    lifecycleScope.launch {
+                        preferencesManager.setUserRole("student")
+                        startMainActivity()
+                    }
                 } else {
                     Toast.makeText(this, "Google login failed", Toast.LENGTH_SHORT).show()
                 }
@@ -94,85 +98,103 @@ class LoginActivity : AppCompatActivity() {
         var parentPassword by remember { mutableStateOf("") }
         var showParentLogin by remember { mutableStateOf(false) }
 
-        Column(
-            modifier = Modifier.fillMaxSize().padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(text = "🎓 Scroll or Study", fontSize = 32.sp, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Sign in to track your progress and build streaks",
-                color = MaterialTheme.colorScheme.outline,
-                fontSize = 16.sp,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(48.dp))
-
-            if (!showParentLogin) {
-                // Student View
-                Button(
-                    onClick = { 
-                        googleSignInClient.signOut().addOnCompleteListener {
-                            launcher.launch(googleSignInClient.signInIntent)
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().height(56.dp)
+        Box(modifier = Modifier.fillMaxSize()) {
+            com.example.scrollorstudy.ui.components.AnimatedMeshBackground()
+            
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(32.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
                 ) {
-                    Text("Continue with Google")
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-                
-                TextButton(onClick = { showParentLogin = true }) {
-                    Text("Parent? Access monitoring here")
-                }
-            } else {
-                // Parent View
-                Text(text = "Parent Login", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                OutlinedTextField(
-                    value = parentId,
-                    onValueChange = { parentId = it },
-                    label = { Text("Enter Student ID") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                OutlinedTextField(
-                    value = parentPassword,
-                    onValueChange = { parentPassword = it },
-                    label = { Text("Password") },
-                    modifier = Modifier.fillMaxWidth(),
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    singleLine = true
-                )
-                
-                Spacer(modifier = Modifier.height(24.dp))
-                
-                Button(
-                    onClick = {
-                        if (parentPassword == "welcome") {
-                            AppState.userRole = "parent"
-                            AppState.studentUidForParent = parentId.trim()
-                            AppState.save(this@LoginActivity)
-                            startMainActivity()
+                    Column(
+                        modifier = Modifier.padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(text = "🎓 Scroll or Study", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "Sign in to track your progress and build streaks",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center
+                        )
+            
+                        Spacer(modifier = Modifier.height(40.dp))
+            
+                        if (!showParentLogin) {
+                            Button(
+                                onClick = { 
+                                    googleSignInClient.signOut().addOnCompleteListener {
+                                        launcher.launch(googleSignInClient.signInIntent)
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth().height(56.dp),
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            ) {
+                                Text("Continue with Google", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            }
+            
+                            Spacer(modifier = Modifier.height(32.dp))
+                            
+                            TextButton(onClick = { showParentLogin = true }) {
+                                Text("Parent? Access monitoring here", fontWeight = FontWeight.Medium)
+                            }
                         } else {
-                            Toast.makeText(this@LoginActivity, "Incorrect password", Toast.LENGTH_SHORT).show()
+                            Text(text = "Parent Portal", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.height(24.dp))
+                            
+                            OutlinedTextField(
+                                value = parentId,
+                                onValueChange = { parentId = it },
+                                label = { Text("Enter Student ID") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            OutlinedTextField(
+                                value = parentPassword,
+                                onValueChange = { parentPassword = it },
+                                label = { Text("Password") },
+                                modifier = Modifier.fillMaxWidth(),
+                                visualTransformation = PasswordVisualTransformation(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                                singleLine = true,
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+                            )
+                            Spacer(modifier = Modifier.height(32.dp))
+                            Button(
+                                onClick = {
+                                    if (parentPassword == "welcome") {
+                                        lifecycleScope.launch {
+                                            preferencesManager.setUserRole("parent")
+                                            preferencesManager.setStudentUidForParent(parentId.trim())
+                                            startMainActivity()
+                                        }
+                                    } else {
+                                        Toast.makeText(this@LoginActivity, "Incorrect password", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth().height(56.dp),
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+                            ) {
+                                Text("Login as Parent", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            TextButton(onClick = { showParentLogin = false }) {
+                                Text("Back to Student Login")
+                            }
                         }
-                    },
-                    modifier = Modifier.fillMaxWidth().height(56.dp)
-                ) {
-                    Text("Login as Parent")
-                }
-                
-                TextButton(onClick = { showParentLogin = false }) {
-                    Text("Back to Student Login")
+                    }
                 }
             }
         }

@@ -58,6 +58,10 @@ dependencies {
     // Navigation
     implementation("androidx.navigation:navigation-compose:2.8.8")
     
+    // DataStore & ViewModel
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    
     // Coil (Image Loading for URL Charts)
     implementation("io.coil-kt:coil-compose:2.6.0")
 

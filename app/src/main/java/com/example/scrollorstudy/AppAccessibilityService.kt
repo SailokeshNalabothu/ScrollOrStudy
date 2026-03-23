@@ -4,8 +4,6 @@ import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.graphics.PixelFormat
 import android.os.Build
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -14,18 +12,23 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.widget.Button
 import android.widget.TextView
-import com.google.firebase.auth.FirebaseAuth
+import com.example.scrollorstudy.data.local.PreferencesManager
+import com.example.scrollorstudy.data.repository.UserRepository
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 
 class AppAccessibilityService : AccessibilityService() {
 
+    private val preferencesManager: PreferencesManager by lazy { (application as ScrollOrStudyApplication).container.preferencesManager }
+    private val userRepository: UserRepository by lazy { (application as ScrollOrStudyApplication).container.userRepository }
+
     private var currentApp: String? = null
     private var distractionSeconds = 0
-    private val handler = Handler(Looper.getMainLooper())
-    private var mainRunnable: Runnable? = null
     private var overlayView: View? = null
     private var windowManager: WindowManager? = null
     
-    private var syncCounter = 0
+    private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var trackingJob: Job? = null
 
     private val distractingApps = listOf(
         "com.google.android.youtube",
@@ -56,194 +59,147 @@ class AppAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         Log.d("TRACKING", "Accessibility Service Connected")
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        AppState.load(this)
-        startGlobalTracking()
-    }
-
-    private fun startGlobalTracking() {
-        mainRunnable = object : Runnable {
-            override fun run() {
-                val activeApp = currentApp
-                
-                if (activeApp != null) {
-                    when {
-                        distractingApps.contains(activeApp) -> {
-                            AppState.scrollTimeToday++
-                            
-                            if (overlayView == null) {
-                                distractionSeconds++
-                                Log.d("TRACKING", "Scrolling: $distractionSeconds sec | Total Today: ${AppState.scrollTimeToday}s")
-
-                                if (distractionSeconds >= 15) {
-                                    Log.d("TRACKING", "Threshold reached! Showing motivation popup.")
-                                    showOverlay()
-                                }
-                            }
-                        }
-                        
-                        usefulApps.contains(activeApp) -> {
-                            AppState.studyTimeToday++
-                            distractionSeconds = 0
-                            removeOverlay()
-                            Log.d("TRACKING", "Studying in $activeApp | Total Today: ${AppState.studyTimeToday}s")
-                        }
-                        
-                        else -> {
-                            if (!systemPackages.contains(activeApp) && activeApp != packageName) {
-                                distractionSeconds = 0
-                                removeOverlay()
-                            }
-                        }
-                    }
-                }
-                
-                syncCounter++
-                if (syncCounter >= 2) {
-                    AppState.save(this@AppAccessibilityService)
-                    syncCounter = 0
-                }
-
-                handler.postDelayed(this, 1000)
-            }
-        }
-        handler.post(mainRunnable!!)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             val packageName = event.packageName?.toString() ?: return
 
-            if (systemPackages.contains(packageName) || packageName == this.packageName) {
+            if (packageName == this.packageName || packageName == "com.android.systemui") {
                 return
             }
 
             if (packageName == currentApp) return
             
             Log.d("TRACKING", "App Changed: $currentApp -> $packageName")
-            
-            // 🔥 AI PREDICTOR: Force push event for testing
-            if (distractingApps.contains(packageName)) {
-                logScrollingEventToFirebase(packageName)
-            }
-
             currentApp = packageName
-            AppState.currentApp = packageName
             
-            if (!distractingApps.contains(packageName)) {
-                distractionSeconds = 0
-                removeOverlay()
-            }
+            manageTrackingCycle()
         }
     }
 
-    private fun logScrollingEventToFirebase(appName: String) {
-        val user = FirebaseAuth.getInstance().currentUser ?: return
-        val database = AppState.getDatabaseInstance()
-        val timestamp = System.currentTimeMillis()
+    private fun manageTrackingCycle() {
+        trackingJob?.cancel()
         
-        Log.d("FIREBASE_AI", "Logging event for $appName at $timestamp")
+        val activeApp = currentApp ?: return
         
-        database.getReference("scrolling_events")
-            .child(user.uid)
-            .push()
-            .setValue(timestamp)
-            .addOnSuccessListener {
-                Log.d("FIREBASE_AI", "Successfully pushed to scrolling_events")
+        if (distractingApps.contains(activeApp) || usefulApps.contains(activeApp)) {
+            trackingJob = serviceScope.launch {
+                while (isActive) {
+                    delay(1000)
+                    val isStudyMode = preferencesManager.isStudyModeActive.first()
+                    
+                    if (distractingApps.contains(activeApp)) {
+                        if (overlayView == null && isStudyMode) {
+                            preferencesManager.updateTime(studyDelta = 0, scrollDelta = 1)
+                            distractionSeconds++
+                            
+                            Log.d("TRACKING", "App: $activeApp | Time: $distractionSeconds sec")
+                            
+                            if (distractionSeconds >= 15) {
+                                Log.d("ALERT", "User wasting time")
+                                showOverlay()
+                            }
+                        }
+                    } else if (usefulApps.contains(activeApp) && isStudyMode) {
+                        preferencesManager.updateTime(studyDelta = 1, scrollDelta = 0)
+                        distractionSeconds = 0
+                        removeOverlay()
+                    }
+                    
+                    if (System.currentTimeMillis() % 10000 < 1000 && isStudyMode) {
+                        syncToFirebase()
+                    }
+                }
             }
-            .addOnFailureListener {
-                Log.e("FIREBASE_AI", "Failed to push: ${it.message}")
-            }
+        } else {
+            distractionSeconds = 0
+            removeOverlay()
+        }
+    }
+
+    private suspend fun syncToFirebase() {
+        val study = preferencesManager.studyTimeToday.first()
+        val scroll = preferencesManager.scrollTimeToday.first()
+        val streak = preferencesManager.currentStreak.first()
+        val name = preferencesManager.userName.first()
+        userRepository.syncDailyProgress(study, scroll, streak, name)
     }
 
     private fun showOverlay() {
-        handler.post {
-            if (overlayView != null) return@post
+        if (overlayView != null) return
 
-            try {
-                val inflater = getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
-                overlayView = inflater.inflate(R.layout.overlay_view, null)
+        try {
+            val inflater = getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
+            overlayView = inflater.inflate(R.layout.overlay_view, null)
 
-                val quoteView = overlayView?.findViewById<TextView>(R.id.tvMotivationQuote)
-                val baseMotivation = AppState.cachedAiMotivation ?: MotivationEngine.getRandomScrollQuote()
-                val closeBtn = overlayView?.findViewById<Button>(R.id.btnClose)
-
-                val params = WindowManager.LayoutParams(
-                    WindowManager.LayoutParams.MATCH_PARENT,
-                    WindowManager.LayoutParams.MATCH_PARENT,
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
-                    } else {
-                        @Suppress("DEPRECATION")
-                        WindowManager.LayoutParams.TYPE_PHONE
-                    },
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or 
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-                    PixelFormat.TRANSLUCENT
-                )
-                params.gravity = Gravity.CENTER
-
-                windowManager?.addView(overlayView, params)
-                Log.d("TRACKING", "Motivation Overlay shown")
-
-                if (AppState.isHardcoreModeActive) {
-                    closeBtn?.visibility = View.GONE
-                    var countdown = 5
-                    val countdownRunnable = object : Runnable {
-                        override fun run() {
-                            if (overlayView == null) return
-                            if (countdown > 0) {
-                                quoteView?.text = "$baseMotivation\n\n⚠️ HARDCORE MODE: App closing in ${countdown}s..."
-                                countdown--
-                                handler.postDelayed(this, 1000)
-                            } else {
-                                Log.d("TRACKING", "Hardcore Mode delayed block! Forcing home screen.")
-                                performGlobalAction(GLOBAL_ACTION_HOME)
-                                removeOverlay()
-                                distractionSeconds = 0
-                            }
-                        }
-                    }
-                    handler.post(countdownRunnable)
+            val quoteView = overlayView?.findViewById<TextView>(R.id.tvMotivationQuote)
+            val closeBtn = overlayView?.findViewById<Button>(R.id.btnClose)
+            
+            val params = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
                 } else {
-                    quoteView?.text = baseMotivation
+                    @Suppress("DEPRECATION")
+                    WindowManager.LayoutParams.TYPE_PHONE
+                },
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or 
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT
+            )
+            params.gravity = Gravity.CENTER
+
+            windowManager?.addView(overlayView, params)
+            
+            serviceScope.launch {
+                val hardcore = preferencesManager.isHardcoreModeActive.first()
+                if (hardcore) {
+                    closeBtn?.visibility = View.GONE
+                    for (i in 5 downTo 1) {
+                        if (overlayView == null) break
+                        quoteView?.text = "⚠️ HARDCORE MODE: App closing in ${i}s..."
+                        delay(1000)
+                    }
+                    if (overlayView != null) {
+                        syncToFirebase()
+                        performGlobalAction(GLOBAL_ACTION_HOME)
+                        removeOverlay()
+                        distractionSeconds = 0
+                    }
+                } else {
+                    val motivation = userRepository.getAiMotivation().first()
+                    quoteView?.text = motivation
                     closeBtn?.visibility = View.VISIBLE
                     closeBtn?.setOnClickListener {
+                        serviceScope.launch { syncToFirebase() }
                         removeOverlay()
                         distractionSeconds = 0
                     }
                 }
-            } catch (e: Exception) {
-                Log.e("TRACKING", "Error showing overlay: ${e.message}")
             }
+        } catch (e: Exception) {
+            Log.e("TRACKING", "Error showing overlay: ${e.message}")
         }
     }
 
     private fun removeOverlay() {
-        handler.post {
-            if (overlayView != null) {
-                try {
-                    windowManager?.removeView(overlayView)
-                    Log.d("TRACKING", "Overlay removed")
-                } catch (e: Exception) {
-                    Log.e("TRACKING", "Error removing overlay: ${e.message}")
-                }
-                overlayView = null
-            }
+        if (overlayView != null) {
+            try {
+                windowManager?.removeView(overlayView)
+            } catch (e: Exception) {}
+            overlayView = null
         }
     }
 
     override fun onInterrupt() {
-        stopGlobalTracking()
-    }
-
-    private fun stopGlobalTracking() {
-        mainRunnable?.let { handler.removeCallbacks(it) }
+        trackingJob?.cancel()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        AppState.save(this)
-        stopGlobalTracking()
+        serviceScope.cancel()
         removeOverlay()
     }
 }
