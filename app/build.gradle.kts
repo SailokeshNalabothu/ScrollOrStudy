@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = "com.example.scrollorstudy"
-    compileSdk = 36
+    compileSdk = 36 // Must be 36 for latest compose library links
 
     defaultConfig {
         applicationId = "com.example.scrollorstudy"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 34 
         versionCode = 1
         versionName = "1.0"
 
